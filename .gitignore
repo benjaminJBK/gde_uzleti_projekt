@@ -1,0 +1,59 @@
+# -------------------
+# Python
+# -------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual env
+venv/
+.env/
+.venv/
+
+# -------------------
+# Jupyter / notebook
+# -------------------
+.ipynb_checkpoints/
+
+# -------------------
+# OS files
+# -------------------
+.DS_Store
+Thumbs.db
+
+# -------------------
+# IDE / Editor
+# -------------------
+.vscode/
+.idea/
+
+# -------------------
+# Logs
+# -------------------
+*.log
+
+# -------------------
+# Model output
+# -------------------
+*.joblib
+*.pkl
+
+# -------------------
+# Matplotlib cache
+# -------------------
+.matplotlib/
+
+# -------------------
+# Build / cache
+# -------------------
+build/
+dist/
+*.egg-info/
+
+# -------------------
+# Temp files
+# -------------------
+*.tmp
+*.temp
