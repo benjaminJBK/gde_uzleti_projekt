@@ -171,6 +171,124 @@ def test_loan_amount_decrease_keeps_approval(trained_models, approved_rows):
 
 
 # ---------------------------------------------------------------------------
+# MR6 — Társ-kérelmező jövedelem monotonitás
+# ---------------------------------------------------------------------------
+
+def test_coapplicant_income_increase_keeps_approval(trained_models, approved_rows):
+    """
+    MR6 — Társ-kérelmező jövedelem növelés monotonitás:
+    Ha egy jóváhagyott kérelmen növeljük a CoapplicantIncome-ot (+2000),
+    a predikció nem változhat meg.
+    Additív módosítást használunk, hogy a nullás értékű sorok is ténylegesen
+    módosuljanak (0 * 2 = 0 nem változtat semmit).
+    """
+    modified = approved_rows.copy()
+    modified["CoapplicantIncome"] = modified["CoapplicantIncome"] + 2000
+
+    for model_name, model in trained_models.items():
+        original_preds = model.predict(approved_rows)
+        modified_preds = model.predict(modified)
+
+        for i in range(len(approved_rows)):
+            assert modified_preds[i] == original_preds[i], (
+                f"[{model_name}] {i+1}. sor: társ-kérelmező jövedelem növelés után a predikció megváltozott: "
+                f"'{original_preds[i]}' -> '{modified_preds[i]}' "
+                f"(eredeti CoapplicantIncome: {approved_rows.loc[i, 'CoapplicantIncome']}, "
+                f"módosított: {modified.loc[i, 'CoapplicantIncome']})"
+            )
+
+
+def test_coapplicant_income_decrease_keeps_rejection(trained_models, rejected_rows):
+    """
+    MR6 — Társ-kérelmező jövedelem csökkentés monotonitás:
+    Ha egy elutasított kérelmen csökkentjük a CoapplicantIncome-ot (felére),
+    a predikció nem változhat meg.
+    Csak olyan sorokat vizsgálunk ahol CoapplicantIncome > 0,
+    hogy a módosítás ténylegesen megtörténjen és ne kerüljön negatív tartományba.
+    """
+    rows = rejected_rows[rejected_rows["CoapplicantIncome"] > 0].reset_index(drop=True)
+    modified = rows.copy()
+    modified["CoapplicantIncome"] = modified["CoapplicantIncome"] * 0.5
+
+    for model_name, model in trained_models.items():
+        original_preds = model.predict(rows)
+        modified_preds = model.predict(modified)
+
+        for i in range(len(rows)):
+            assert modified_preds[i] == original_preds[i], (
+                f"[{model_name}] {i+1}. sor: társ-kérelmező jövedelem csökkentés után a predikció megváltozott: "
+                f"'{original_preds[i]}' -> '{modified_preds[i]}' "
+                f"(eredeti CoapplicantIncome: {rows.loc[i, 'CoapplicantIncome']}, "
+                f"módosított: {modified.loc[i, 'CoapplicantIncome']})"
+            )
+
+
+# ---------------------------------------------------------------------------
+# MR7 — Arányos skálázás invariancia
+# ---------------------------------------------------------------------------
+
+def test_proportional_income_loan_scaling(trained_models, approved_rows):
+    """
+    MR7 — Arányos skálázás stabilitás:
+    Ha az ApplicantIncome-ot és a LoanAmount-ot egyszerre, azonos arányban növeljük
+    (kétszeresére), a modell predikcióját stabilnak várjuk, mivel a két jellemző
+    relatív viszonya nem változik. Ez a teszt a modell stabilitását ellenőrzi
+    együttes, arányos perturbáció esetén.
+    """
+    modified = approved_rows.copy()
+    modified["ApplicantIncome"] = modified["ApplicantIncome"] * 2
+    modified["LoanAmount"] = modified["LoanAmount"] * 2
+
+    for model_name, model in trained_models.items():
+        original_preds = model.predict(approved_rows)
+        modified_preds = model.predict(modified)
+
+        for i in range(len(approved_rows)):
+            assert modified_preds[i] == original_preds[i], (
+                f"[{model_name}] {i+1}. sor: arányos skálázás után a predikció megváltozott: "
+                f"'{original_preds[i]}' -> '{modified_preds[i]}' "
+                f"(ApplicantIncome: {approved_rows.loc[i, 'ApplicantIncome']} -> {modified.loc[i, 'ApplicantIncome']}, "
+                f"LoanAmount: {approved_rows.loc[i, 'LoanAmount']} -> {modified.loc[i, 'LoanAmount']})"
+            )
+
+
+# ---------------------------------------------------------------------------
+# MR8 — Gender fairness invariancia
+# ---------------------------------------------------------------------------
+
+def test_gender_swap_fairness(trained_models):
+    """
+    MR8 — Gender fairness invariancia:
+    Ha egy kérelmező nemét Male-ről Female-re (vagy fordítva) változtatjuk,
+    minden más jellemző változatlan marad, a predikciónak nem szabad megváltoznia.
+    A modell nem hozhat eltérő döntést pusztán a nem alapján.
+    15 vegyes sort használunk.
+    """
+    df = pd.read_csv(TRAIN_PATH)
+    sample = (
+        df[df["Gender"].notna()]
+        .head(15)
+        .drop(columns=["Loan_ID", "Loan_Status"])
+        .reset_index(drop=True)
+    )
+
+    modified = sample.copy()
+    modified["Gender"] = modified["Gender"].map({"Male": "Female", "Female": "Male"})
+
+    for model_name, model in trained_models.items():
+        original_preds = model.predict(sample)
+        modified_preds = model.predict(modified)
+
+        for i in range(len(sample)):
+            assert original_preds[i] == modified_preds[i], (
+                f"[{model_name}] {i+1}. sor: nem csere után a predikció megváltozott: "
+                f"'{original_preds[i]}' -> '{modified_preds[i]}' "
+                f"(eredeti Gender: '{sample.loc[i, 'Gender']}', "
+                f"módosított: '{modified.loc[i, 'Gender']}')"
+            )
+
+
+# ---------------------------------------------------------------------------
 # MR5 — Duplikált sor konzisztencia
 # ---------------------------------------------------------------------------
 
